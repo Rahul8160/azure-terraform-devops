@@ -14,8 +14,10 @@ variables:
 stages:
   - stage: Validate
     displayName: Terraform Validate
+
     jobs:
       - job: Validate
+
         steps:
           - task: TerraformInstaller@1
             displayName: Install Terraform
@@ -29,16 +31,23 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               workingDirectory: $(workingDirectory)
+
               inlineScript: |
-                terraform init
+                set -e
+
+                export ARM_OIDC_AZURE_SERVICE_CONNECTION_ID="$AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"
+
+                terraform init -input=false
                 terraform fmt -check -recursive
                 terraform validate
 
   - stage: Plan
     displayName: Terraform Plan
     dependsOn: Validate
+
     jobs:
       - job: Plan
+
         steps:
           - task: TerraformInstaller@1
             displayName: Install Terraform
@@ -52,9 +61,16 @@ stages:
               scriptType: bash
               scriptLocation: inlineScript
               workingDirectory: $(workingDirectory)
+
               inlineScript: |
-                terraform init
+                set -e
+
+                export ARM_OIDC_AZURE_SERVICE_CONNECTION_ID="$AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"
+
+                terraform init -input=false
+
                 terraform plan \
+                  -input=false \
                   -var-file="env/dev.tfvars" \
                   -out=tfplan
 
