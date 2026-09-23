@@ -12,7 +12,6 @@ variables:
   serviceConnection: "sc-azure-terraform-devops"
 
 stages:
-
   # ============================================================
   # VALIDATE
   # ============================================================
@@ -24,7 +23,6 @@ stages:
         displayName: Validate Terraform
 
         steps:
-
           - task: TerraformInstaller@1
             displayName: Install Terraform
             inputs:
@@ -44,6 +42,8 @@ stages:
                 echo "Azure subscription:"
                 az account show --query "{name:name, id:id}" -o table
 
+                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+
                 echo "Terraform version:"
                 terraform version
 
@@ -52,7 +52,6 @@ stages:
                 terraform fmt -check -recursive
 
                 terraform validate
-
 
   # ============================================================
   # PLAN
@@ -67,7 +66,6 @@ stages:
         displayName: Generate Terraform Plan
 
         steps:
-
           - task: TerraformInstaller@1
             displayName: Install Terraform
             inputs:
@@ -86,6 +84,8 @@ stages:
 
                 echo "Azure subscription:"
                 az account show --query "{name:name, id:id}" -o table
+
+                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
 
                 terraform init -input=false
 
