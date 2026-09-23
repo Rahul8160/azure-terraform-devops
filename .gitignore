@@ -12,7 +12,7 @@ crash.*.log
 tfplan
 
 # Local variable files
-*.tfvars
+terraform.tfvars
 *.tfvars.json
 
 # Override files

@@ -1,8 +1,8 @@
-variable "subscription_id" {
-  description = "Azure subscription ID where resources will be deployed."
-  type        = string
-  sensitive   = true
-}
+# variable "subscription_id" {
+#   description = "Azure subscription ID where resources will be deployed."
+#   type        = string
+#   sensitive   = true
+# }
 
 variable "project_name" {
   description = "Short name used for the project resources."

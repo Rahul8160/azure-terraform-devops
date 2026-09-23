@@ -12,13 +12,19 @@ variables:
   serviceConnection: "sc-azure-terraform-devops"
 
 stages:
+
+  # ============================================================
+  # VALIDATE
+  # ============================================================
   - stage: Validate
     displayName: Terraform Validate
 
     jobs:
       - job: Validate
+        displayName: Validate Terraform
 
         steps:
+
           - task: TerraformInstaller@1
             displayName: Install Terraform
             inputs:
@@ -35,20 +41,33 @@ stages:
               inlineScript: |
                 set -e
 
-                export ARM_OIDC_AZURE_SERVICE_CONNECTION_ID="$AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"
+                echo "Azure subscription:"
+                az account show --query "{name:name, id:id}" -o table
+
+                echo "Terraform version:"
+                terraform version
 
                 terraform init -input=false
+
                 terraform fmt -check -recursive
+
                 terraform validate
 
+
+  # ============================================================
+  # PLAN
+  # ============================================================
   - stage: Plan
     displayName: Terraform Plan
+
     dependsOn: Validate
 
     jobs:
       - job: Plan
+        displayName: Generate Terraform Plan
 
         steps:
+
           - task: TerraformInstaller@1
             displayName: Install Terraform
             inputs:
@@ -65,7 +84,8 @@ stages:
               inlineScript: |
                 set -e
 
-                export ARM_OIDC_AZURE_SERVICE_CONNECTION_ID="$AZURESUBSCRIPTION_SERVICE_CONNECTION_ID"
+                echo "Azure subscription:"
+                az account show --query "{name:name, id:id}" -o table
 
                 terraform init -input=false
 
@@ -76,3 +96,4 @@ stages:
 
           - publish: $(workingDirectory)/tfplan
             artifact: terraform-plan
+            displayName: Publish Terraform Plan
