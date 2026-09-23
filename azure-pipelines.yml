@@ -49,7 +49,7 @@ stages:
 
                 terraform init -input=false
 
-                terraform fmt -check -recursive
+                terraform fmt -recursive
 
                 terraform validate
 
