@@ -42,10 +42,21 @@ stages:
                 trivy config . --severity HIGH,CRITICAL --exit-code 1 --format table
 
                 if [ "${{ parameters.driftCheckOnly }}" = "True" ]; then
+
+                  # NEW: check if this environment has ever been deployed
+                  # before treating a plan diff as "drift"
+                  RESOURCE_COUNT=$(terraform state list | wc -l)
+
+                  if [ "$RESOURCE_COUNT" -eq 0 ]; then
+                    echo "##vso[task.logissue type=warning]${{ parameters.environment }} has no resources in state yet - nothing has been deployed. Skipping drift check."
+                    exit 0
+                  fi
+
                   set +e
                   terraform plan -input=false -var-file="env/${{ parameters.environment }}.tfvars" -detailed-exitcode
                   exitcode=$?
                   set -e
+
                   if [ $exitcode -eq 0 ]; then
                     echo "No drift detected in ${{ parameters.environment }}."
                   elif [ $exitcode -eq 2 ]; then
@@ -54,11 +65,12 @@ stages:
                   else
                     exit 1
                   fi
+
                 else
                   terraform plan -input=false -var-file="env/${{ parameters.environment }}.tfvars" -out=tfplan
                 fi
 
           - ${{ if eq(parameters.driftCheckOnly, false) }}:
-              - publish: $(workingDirectory)/tfplan
-                artifact: tfplan-${{ parameters.environment }}
-                displayName: Publish Terraform Plan
+            - publish: $(workingDirectory)/tfplan
+              artifact: tfplan-${{ parameters.environment }}
+              displayName: Publish Terraform Plan
