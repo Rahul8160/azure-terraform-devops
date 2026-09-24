@@ -1,0 +1,25 @@
+trigger: none
+
+schedules:
+  - cron: "0 6 * * 1"
+    displayName: Weekly drift check - all environments
+    branches:
+      include:
+        - main
+    always: true
+
+variables:
+  terraformVersion: "1.13.3"
+  workingDirectory: "terraform"
+  serviceConnection: "sc-azure-terraform-devops"
+
+stages:
+  - template: pipelines/templates/terraform-plan.yml
+    parameters:
+      environment: dev
+      driftCheckOnly: true
+
+  - template: pipelines/templates/terraform-plan.yml
+    parameters:
+      environment: prod
+      driftCheckOnly: true
