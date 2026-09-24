@@ -1,0 +1,64 @@
+parameters:
+  - name: environment
+    type: string
+  - name: driftCheckOnly
+    type: boolean
+    default: false
+
+stages:
+  - stage: Plan_${{ parameters.environment }}
+    displayName: Terraform Plan - ${{ parameters.environment }}
+    jobs:
+      - job: Plan
+        displayName: Validate, Scan and Plan (${{ parameters.environment }})
+        pool:
+          vmImage: ubuntu-latest
+        steps:
+          - task: TerraformInstaller@1
+            displayName: Install Terraform
+            inputs:
+              terraformVersion: $(terraformVersion)
+
+          - script: |
+              set -e
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                | sh -s -- -b /usr/local/bin
+            displayName: Install Trivy
+
+          - task: AzureCLI@2
+            displayName: Init, Validate, Scan and Plan
+            inputs:
+              azureSubscription: $(serviceConnection)
+              scriptType: bash
+              scriptLocation: inlineScript
+              workingDirectory: $(workingDirectory)
+              inlineScript: |
+                set -e
+                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+
+                terraform init -input=false -backend-config="key=${{ parameters.environment }}.terraform.tfstate"
+                terraform fmt -recursive
+                terraform validate
+                trivy config . --severity HIGH,CRITICAL --exit-code 1 --format table
+
+                if [ "${{ parameters.driftCheckOnly }}" = "True" ]; then
+                  set +e
+                  terraform plan -input=false -var-file="env/${{ parameters.environment }}.tfvars" -detailed-exitcode
+                  exitcode=$?
+                  set -e
+                  if [ $exitcode -eq 0 ]; then
+                    echo "No drift detected in ${{ parameters.environment }}."
+                  elif [ $exitcode -eq 2 ]; then
+                    echo "##vso[task.logissue type=warning]Drift detected in ${{ parameters.environment }}."
+                    exit 1
+                  else
+                    exit 1
+                  fi
+                else
+                  terraform plan -input=false -var-file="env/${{ parameters.environment }}.tfvars" -out=tfplan
+                fi
+
+          - ${{ if eq(parameters.driftCheckOnly, false) }}:
+              - publish: $(workingDirectory)/tfplan
+                artifact: tfplan-${{ parameters.environment }}
+                displayName: Publish Terraform Plan

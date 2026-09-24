@@ -1,0 +1,32 @@
+parameters:
+  - name: environment
+    type: string
+
+stages:
+  - stage: Destroy_${{ parameters.environment }}
+    displayName: Terraform Destroy - ${{ parameters.environment }}
+    jobs:
+      - deployment: Destroy
+        pool:
+          vmImage: ubuntu-latest
+        environment: ${{ parameters.environment }}
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - task: TerraformInstaller@1
+                  inputs:
+                    terraformVersion: $(terraformVersion)
+                - task: AzureCLI@2
+                  displayName: Terraform Init and Destroy
+                  inputs:
+                    azureSubscription: $(serviceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    workingDirectory: $(workingDirectory)
+                    inlineScript: |
+                      set -e
+                      export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+                      terraform init -input=false -backend-config="key=${{ parameters.environment }}.terraform.tfstate"
+                      terraform destroy -input=false -var-file="env/${{ parameters.environment }}.tfvars" -auto-approve

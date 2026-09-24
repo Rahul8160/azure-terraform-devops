@@ -1,0 +1,40 @@
+parameters:
+  - name: environment
+    type: string
+
+stages:
+  - stage: Apply_${{ parameters.environment }}
+    displayName: Terraform Apply - ${{ parameters.environment }}
+    dependsOn: Plan_${{ parameters.environment }}
+    condition: succeeded()
+    jobs:
+      - deployment: Apply
+        displayName: Apply Terraform Plan (${{ parameters.environment }})
+        pool:
+          vmImage: ubuntu-latest
+        environment: ${{ parameters.environment }} # approval gate - matches the environment being deployed
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - download: current
+                  artifact: tfplan-${{ parameters.environment }}
+                - task: TerraformInstaller@1
+                  inputs:
+                    terraformVersion: $(terraformVersion)
+                - script: |
+                    cp $(Pipeline.Workspace)/tfplan-${{ parameters.environment }}/tfplan $(workingDirectory)/tfplan
+                  displayName: Move plan into working directory
+                - task: AzureCLI@2
+                  displayName: Terraform Init and Apply
+                  inputs:
+                    azureSubscription: $(serviceConnection)
+                    scriptType: bash
+                    scriptLocation: inlineScript
+                    workingDirectory: $(workingDirectory)
+                    inlineScript: |
+                      set -e
+                      export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
+                      terraform init -input=false -backend-config="key=${{ parameters.environment }}.terraform.tfstate"
+                      terraform apply -input=false -auto-approve tfplan

@@ -1,11 +1,8 @@
-trigger:
-  branches:
-    include:
-      - main
+trigger: none
 
 parameters:
   - name: environment
-    displayName: Target Environment
+    displayName: Environment to destroy
     type: string
     default: dev
     values:
@@ -18,11 +15,6 @@ variables:
   serviceConnection: "sc-azure-terraform-devops"
 
 stages:
-  - template: pipelines/templates/terraform-plan.yml
-    parameters:
-      environment: ${{ parameters.environment }}
-      driftCheckOnly: false
-
-  - template: pipelines/templates/terraform-apply.yml
+  - template: pipelines/templates/terraform-destroy.yml
     parameters:
       environment: ${{ parameters.environment }}
