@@ -13,14 +13,17 @@ variables:
 
 stages:
   # ============================================================
-  # VALIDATE
+  # CI: Validate + Security Scan + Plan
+  # These are all pre-checks - nothing here touches real Azure
+  # resources, so there's no reason to split them into separate
+  # stages/agents. Only Apply gets its own stage (for the approval gate).
   # ============================================================
-  - stage: Validate
-    displayName: Terraform Validate
+  - stage: CI
+    displayName: Terraform CI (Validate, Scan, Plan)
 
     jobs:
-      - job: Validate
-        displayName: Validate Terraform
+      - job: CI
+        displayName: Validate, Scan and Plan
 
         steps:
           - task: TerraformInstaller@1
@@ -28,8 +31,15 @@ stages:
             inputs:
               terraformVersion: $(terraformVersion)
 
+          - script: |
+              set -e
+              curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh \
+                | sh -s -- -b /usr/local/bin
+              trivy --version
+            displayName: Install Trivy
+
           - task: AzureCLI@2
-            displayName: Terraform Init and Validate
+            displayName: Init, Validate, Scan and Plan
             inputs:
               azureSubscription: $(serviceConnection)
               scriptType: bash
@@ -47,47 +57,15 @@ stages:
                 echo "Terraform version:"
                 terraform version
 
+                # init runs ONCE now, not twice
                 terraform init -input=false
 
                 terraform fmt -recursive
-
                 terraform validate
 
-  # ============================================================
-  # PLAN
-  # ============================================================
-  - stage: Plan
-    displayName: Terraform Plan
-
-    dependsOn: Validate
-
-    jobs:
-      - job: Plan
-        displayName: Generate Terraform Plan
-
-        steps:
-          - task: TerraformInstaller@1
-            displayName: Install Terraform
-            inputs:
-              terraformVersion: $(terraformVersion)
-
-          - task: AzureCLI@2
-            displayName: Terraform Plan
-            inputs:
-              azureSubscription: $(serviceConnection)
-              scriptType: bash
-              scriptLocation: inlineScript
-              workingDirectory: $(workingDirectory)
-
-              inlineScript: |
-                set -e
-
-                echo "Azure subscription:"
-                az account show --query "{name:name, id:id}" -o table
-
-                export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
-
-                terraform init -input=false
+                # security scan - stops here if HIGH/CRITICAL found,
+                # so a bad plan never even gets generated
+                trivy config . --severity HIGH,CRITICAL --exit-code 1 --format table
 
                 terraform plan \
                   -input=false \
